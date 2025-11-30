@@ -1,97 +1,220 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include "RTClib.h"
 #include "DFRobotDFPlayerMini.h"
-#include <HardwareSerial.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
 
-// Use UART1 on ESP32
+// -----------------------------
+// Hardware pins
+// -----------------------------
+#define DFPLAYER_RX 26  // ESP32 RX (connects to DFPlayer TX)
+#define DFPLAYER_TX 27  // ESP32 TX (connects to DFPlayer RX)
+
+
+// I2C for RTC
+#define SDA_PIN 21
+#define SCL_PIN 22
+
+// -----------------------------
+// DFPlayer / RTC / WebServer
+// -----------------------------
 HardwareSerial dfSerial(1);
 DFRobotDFPlayerMini dfplayer;
+RTC_DS3231 rtc;
+WebServer server(80);
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
 
-// --- Mapping Table ---
+bool setupDone = false;
+bool rtcAvailable = false;
+bool spokenThisHour = false;
+
+// -----------------------------
+// Mapping table (dual-folder)
+// -----------------------------
 struct Phrase {
   uint8_t folder;
   uint8_t track;
 };
 
-// Logical words
-enum Words {
-  ONE = 0,
-  TWO,
-  THREE,
-  FOUR,
-  FIVE,
-  SIX,
-  SEVEN,
-  EIGHT,
-  NINE,
-  TEN,
-  ELEVEN,
-  TWELVE,
-  GOOD_MORNING,
-  ITS,
-  OCLOCK
+// Folder 01: numbers 1–12
+// Folder 02: phrases (Good Morning / It’s / O’Clock)
+Phrase hourPhrases[] = {
+  {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6},
+  {1, 7}, {1, 8}, {1, 9}, {1,10}, {1,11}, {1,12}
 };
 
-// Map logical words → folder/track
-const Phrase phraseMap[] = {
-  {1, 1},  // ONE
-  {1, 2},  // TWO
-  {1, 3},  // THREE
-  {1, 4},  // FOUR
-  {1, 5},  // FIVE
-  {1, 6},  // SIX
-  {1, 7},  // SEVEN
-  {1, 8},  // EIGHT
-  {1, 9},  // NINE
-  {1, 10}, // TEN
-  {1, 11}, // ELEVEN
-  {1, 12}, // TWELVE
-  {2, 1},  // GOOD_MORNING
-  {2, 2},  // ITS
-  {2, 3}   // OCLOCK
+Phrase greetingPhrases[] = {
+  {2, 1}, // Good Morning
+  {2, 2}, // It's
+  {2, 3}  // O'Clock
 };
 
-// Approximate track durations (ms)
-const uint16_t trackLengthMs[] = {
-  800,800,800,800,800,800,800,800,800,800,800,800,  // ONE → TWELVE
-  1200, 800, 800 // GOOD_MORNING, ITS, OCLOCK
+// -----------------------------
+// HTML for captive portal
+// -----------------------------
+const char HTML_PAGE[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Athena Clock Setup</title>
+<style>
+body { font-family: Arial; display:flex; justify-content:center; align-items:center; height:100vh; background:#f0f0f0; }
+#container { max-width:300px; padding:20px; background:white; border-radius:12px; box-shadow:0 0 10px rgba(0,0,0,0.1); text-align:center; }
+</style>
+</head>
+<body>
+<div id="container">
+<h2>Setting Clock…</h2>
+<p>Please wait</p>
+</div>
+<script>
+window.onload = () => {
+  let ts = Math.floor(Date.now()/1000);
+  fetch("/set?ts=" + ts)
+    .then(() => { document.body.innerHTML = "<h1>✔ Time Saved to RTC</h1><p>You may close this page.</p>"; });
 };
+</script>
+</body>
+</html>
+)rawliteral";
 
+// -----------------------------
+// Captive portal
+// -----------------------------
+void startCaptivePortal() {
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("ATHENA-SETUP", "");
+  delay(300);
+  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+
+  server.onNotFound([]() {
+    server.send(200, "text/html", HTML_PAGE);
+  });
+
+  server.on("/set", []() {
+    if (!server.hasArg("ts")) return;
+    time_t ts = server.arg("ts").toInt();
+    Serial.println("\n=== Time Received From Phone ===");
+    Serial.printf("Unix Time: %ld\n", ts);
+    DateTime dt = DateTime(ts);
+    if (rtcAvailable) {
+      rtc.adjust(dt);
+      Serial.println("RTC Updated.");
+    } else {
+      Serial.println("RTC NOT FOUND — cannot set hardware clock.");
+    }
+    setupDone = true;
+    server.send(200, "text/plain", "OK");
+    server.stop();
+    dnsServer.stop();
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_STA);
+    Serial.println("Clock setup complete — Wi-Fi AP disabled.");
+  });
+
+  server.begin();
+}
+
+// -----------------------------
+// Helper: play full sentence
+// -----------------------------
+void playHourAnnouncement(uint8_t hour) {
+  // Simple greeting selection based on hour
+  uint8_t greetingIndex = 0; // Always Good Morning for demo; can adapt
+
+  // Sequence: Greeting -> "It's" -> Hour -> "O'Clock"
+  dfplayer.playFolder(greetingPhrases[greetingIndex].folder,
+                      greetingPhrases[greetingIndex].track);
+  delay(1200);
+
+  dfplayer.playFolder(greetingPhrases[1].folder,
+                      greetingPhrases[1].track);
+  delay(800);
+
+  // Hour: convert 0–23 -> 1–12
+  uint8_t h12 = hour % 12;
+  if (h12 == 0) h12 = 12;
+
+  dfplayer.playFolder(hourPhrases[h12 - 1].folder,
+                      hourPhrases[h12 - 1].track);
+  delay(800);
+
+  dfplayer.playFolder(greetingPhrases[2].folder,
+                      greetingPhrases[2].track);
+  delay(1200);
+}
+
+// -----------------------------
+// Setup
+// -----------------------------
 void setup() {
   Serial.begin(115200);
-  dfSerial.begin(9600, SERIAL_8N1, 26, 27);
 
-  Serial.println("Initializing DFPlayer...");
+  // DFPlayer
+  dfSerial.begin(9600, SERIAL_8N1, DFPLAYER_RX, DFPLAYER_TX);
   if (!dfplayer.begin(dfSerial)) {
     Serial.println("DFPlayer Mini not responding!");
-    while(true);
+    while (true);
   }
   dfplayer.volume(25);
-  Serial.println("DFPlayer Initialised!");
+  Serial.println("DFPlayer initialized.");
 
-  // Simulated current time (1–12 hours)
-  uint8_t hour = 3; // Example: 3 o'clock
-
-  // Play a greeting sequence based on time
-  Words sequence[] = {GOOD_MORNING, ITS, static_cast<Words>(hour - 1), OCLOCK};
-  playSequence(sequence, sizeof(sequence)/sizeof(sequence[0]));
-  Serial.println("Done playing time announcement!");
-}
-
-void loop() {
-  // Nothing needed here; later you can trigger this hourly
-}
-
-// Function to play a sequence of word IDs
-void playSequence(Words seq[], size_t len) {
-  for (size_t i = 0; i < len; i++) {
-    Phrase p = phraseMap[seq[i]];
-    Serial.print("Playing folder ");
-    Serial.print(p.folder);
-    Serial.print(", track ");
-    Serial.println(p.track);
-
-    dfplayer.playFolder(p.folder, p.track);
-
-    // Wait for track to finish (approximate)
-    delay(trackLengthMs[seq[i]]);
+  // RTC
+  Wire.begin(SDA_PIN, SCL_PIN);
+  if (rtc.begin()) {
+    rtcAvailable = true;
+    if (!rtc.lostPower()) {
+      Serial.println("RTC already has valid time.");
+      setupDone = true;
+    } else {
+      Serial.println("RTC power lost — needs setup.");
+    }
+  } else {
+    Serial.println("ERROR: RTC not found!");
   }
+
+  // Captive portal if needed
+  if (!setupDone) {
+    Serial.println("Entering FIRST-TIME SETUP MODE...");
+    startCaptivePortal();
+  } else {
+    Serial.println("Setup done. Ready for hourly announcements.");
+  }
+}
+
+// -----------------------------
+// Loop
+// -----------------------------
+void loop() {
+  // Handle captive portal
+  if (!setupDone) {
+    dnsServer.processNextRequest();
+    server.handleClient();
+    return;
+  }
+
+  if (!rtcAvailable) {
+    Serial.println("No RTC available!");
+    delay(2000);
+    return;
+  }
+
+  DateTime now = rtc.now();
+
+  // Announce on the hour
+  if (now.minute() == 0 && !spokenThisHour) {
+    Serial.printf("Playing hourly announcement: %02d:00\n", now.hour());
+    playHourAnnouncement(now.hour());
+    spokenThisHour = true;
+  }
+
+  if (now.minute() != 0) {
+    spokenThisHour = false;
+  }
+
+  delay(1000);
 }
