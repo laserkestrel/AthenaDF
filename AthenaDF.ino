@@ -52,12 +52,19 @@ Phrase hourPhrases[] = {
 // Folder 02: phrases
 Phrase greetingPhrases[] = {
   {2, 1},  // Good Morning      (001.mp3)
-  {2, 2},  // It's              (002.mp3)
+  {2, 2},  // It is             (002.mp3)
   {2, 3},  // O'Clock           (003.mp3)
   {2, 4},  // Good Afternoon    (004.mp3)
   {2, 5},  // Good Evening      (005.mp3)
+  {2, 7},  // Kalespera         (007.mp3)
   {2, 8},  // Setup Request     (008.mp3)
-  {2, 9}   // Efkaristo         (009.mp3)
+  {2, 9},  // Efkaristo         (009.mp3)
+  {2,10},  // Petros - the man of stone (010.mp3)
+  {2,11},  // Yamas Petros, Another Glass? (011.mp3)
+  {2,12},  // Beware Mortal     (012.mp3)
+  {2,13},  // Kalemera          (013.mp3)
+  {2,14},  // Yasou             (014.mp3)
+  {2,15}   // Opa!              (015.mp3)
 };
 
 // -----------------------------
