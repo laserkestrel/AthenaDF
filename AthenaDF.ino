@@ -31,9 +31,9 @@ bool rtcAvailable = false;
 bool spokenThisHour = false;
 
 // -----------------------------
-// Test mode
+// Test mode (announce every minute)
 // -----------------------------
-bool testMode = true;  // Set true to announce every minute for testing
+bool testMode = true;  // Set to true for testing
 
 // -----------------------------
 // Mapping table (dual-folder)
@@ -44,16 +44,20 @@ struct Phrase {
 };
 
 // Folder 01: numbers 1–12
-// Folder 02: phrases (Good Morning / It’s / O’Clock)
 Phrase hourPhrases[] = {
   {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6},
   {1, 7}, {1, 8}, {1, 9}, {1,10}, {1,11}, {1,12}
 };
 
+// Folder 02: phrases
 Phrase greetingPhrases[] = {
-  {2, 1}, // Good Morning
-  {2, 2}, // It's
-  {2, 3}  // O'Clock
+  {2, 1},  // Good Morning      (001.mp3)
+  {2, 2},  // It's              (002.mp3)
+  {2, 3},  // O'Clock           (003.mp3)
+  {2, 4},  // Good Afternoon    (004.mp3)
+  {2, 5},  // Good Evening      (005.mp3)
+  {2, 8},  // Setup Request     (008.mp3)
+  {2, 9}   // Efkaristo         (009.mp3)
 };
 
 // -----------------------------
@@ -79,7 +83,7 @@ body { font-family: Arial; display:flex; justify-content:center; align-items:cen
 window.onload = () => {
   let ts = Math.floor(Date.now()/1000);
   fetch("/set?ts=" + ts)
-    .then(() => { document.body.innerHTML = "<h1>✔ Time Saved to RTC</h1><p>You may close this page.</p>"; });
+    .then(() => { document.body.innerHTML = "<h1>Time Saved to RTC</h1><p>You may close this page.</p>"; });
 };
 </script>
 </body>
@@ -124,31 +128,43 @@ void startCaptivePortal() {
 }
 
 // -----------------------------
-// Helper: play full sentence
+// Smart greeting + phrase assembly
 // -----------------------------
 void playHourAnnouncement(uint8_t hour) {
-  // Simple greeting selection based on hour
-  uint8_t greetingIndex = 0; // Always Good Morning for demo
 
-  // Sequence: Greeting -> "It's" -> Hour -> "O'Clock"
-  dfplayer.playFolder(greetingPhrases[greetingIndex].folder,
-                      greetingPhrases[greetingIndex].track);
+  uint8_t greetingTrack = 1; // default Good Morning
+
+  // Smart greeting selection:
+  // 05–11 → Good Morning (track 1)
+  // 12–17 → Good Afternoon (track 4)
+  // 18–22 → Good Evening (track 5)
+  // 23–04 → Good Evening (fallback)
+
+  if (hour >= 5 && hour < 12) {
+    greetingTrack = 1;  // Good Morning
+  } else if (hour >= 12 && hour < 18) {
+    greetingTrack = 4;  // Good Afternoon
+  } else {
+    greetingTrack = 5;  // Good Evening
+  }
+
+  // Play greeting
+  dfplayer.playFolder(2, greetingTrack);
   delay(1200);
 
-  dfplayer.playFolder(greetingPhrases[1].folder,
-                      greetingPhrases[1].track);
+  // Play "It's"
+  dfplayer.playFolder(2, 2);
   delay(800);
 
-  // Hour: convert 0–23 -> 1–12
+  // Convert 24h → 12h
   uint8_t h12 = hour % 12;
   if (h12 == 0) h12 = 12;
 
-  dfplayer.playFolder(hourPhrases[h12 - 1].folder,
-                      hourPhrases[h12 - 1].track);
+  dfplayer.playFolder(1, h12);
   delay(800);
 
-  dfplayer.playFolder(greetingPhrases[2].folder,
-                      greetingPhrases[2].track);
+  // Play "O'Clock"
+  dfplayer.playFolder(2, 3);
   delay(1200);
 }
 
@@ -185,8 +201,16 @@ void setup() {
   if (!setupDone) {
     Serial.println("Entering FIRST-TIME SETUP MODE...");
     startCaptivePortal();
+    // Play "Setup Request" voice prompt (Folder 02 / Track 008)
+    delay(2000);
+    dfplayer.playFolder(2, 8);
+    delay(2000);
   } else {
-    Serial.println("Setup done. Ready for hourly announcements.");
+    Serial.println("Setup done. Ready for announcements.");
+    // Say thankyou
+    delay(2000);
+    dfplayer.playFolder(2, 9);
+    delay(2000);
   }
 }
 
@@ -194,7 +218,7 @@ void setup() {
 // Loop
 // -----------------------------
 void loop() {
-  // Handle captive portal
+  // Captive portal active?
   if (!setupDone) {
     dnsServer.processNextRequest();
     server.handleClient();
@@ -216,7 +240,7 @@ void loop() {
     // Announce every minute
     if (!spokenThisHour) shouldAnnounce = true;
   } else {
-    // Normal mode: announce only at the top of the hour
+    // Only top of hour
     if (now.minute() == 0 && !spokenThisHour) shouldAnnounce = true;
   }
 
@@ -226,7 +250,7 @@ void loop() {
     spokenThisHour = true;
   }
 
-  // Reset flag when minute changes
+  // Reset at minute change
   static uint8_t lastMinute = 255;
   if (now.minute() != lastMinute) {
     spokenThisHour = false;
