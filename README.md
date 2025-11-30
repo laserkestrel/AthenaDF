@@ -19,23 +19,39 @@ This project implements a **spoken clock** using an ESP32, a DFPlayer Mini, and 
 To ensure **deterministic playback**, all audio files are NOT stored in the root, and use folders on the SD card based on purpose.
 
 
-| Logical Word    | Folder | Track | File on SD Card  |
-|-----------------|--------|-------|------------------|
-| ONE             | 01     | 001   | 01/001.mp3       |
-| TWO             | 01     | 002   | 01/002.mp3       |
-| THREE           | 01     | 003   | 01/003.mp3       |
-| FOUR            | 01     | 004   | 01/004.mp3       |
-| FIVE            | 01     | 005   | 01/005.mp3       |
-| SIX             | 01     | 006   | 01/006.mp3       |
-| SEVEN           | 01     | 007   | 01/007.mp3       |
-| EIGHT           | 01     | 008   | 01/008.mp3       |
-| NINE            | 01     | 009   | 01/009.mp3       |
-| TEN             | 01     | 010   | 01/010.mp3       |
-| ELEVEN          | 01     | 011   | 01/011.mp3       |
-| TWELVE          | 01     | 012   | 01/012.mp3       |
-| GOOD_MORNING    | 02     | 001   | 02/001.mp3       |
-| ITS             | 02     | 002   | 02/002.mp3       |
-| OCLOCK          | 02     | 003   | 02/003.mp3       |
+| Logical Word                           | Folder | Track | File on SD Card  |
+|----------------------------------------|--------|-------|------------------|
+| ONE                                    | 01     | 001   | 01/001.mp3       |
+| TWO                                    | 01     | 002   | 01/002.mp3       |
+| THREE                                  | 01     | 003   | 01/003.mp3       |
+| FOUR                                   | 01     | 004   | 01/004.mp3       |
+| FIVE                                   | 01     | 005   | 01/005.mp3       |
+| SIX                                    | 01     | 006   | 01/006.mp3       |
+| SEVEN                                  | 01     | 007   | 01/007.mp3       |
+| EIGHT                                  | 01     | 008   | 01/008.mp3       |
+| NINE                                   | 01     | 009   | 01/009.mp3       |
+| TEN                                    | 01     | 010   | 01/010.mp3       |
+| ELEVEN                                 | 01     | 011   | 01/011.mp3       |
+| TWELVE                                 | 01     | 012   | 01/012.mp3       |
+
+### **Folder 02 – Phrases**
+| Logical Word                           | Folder | Track | File on SD Card  |
+|----------------------------------------|--------|-------|------------------|
+| GOOD_MORNING                           | 02     | 001   | 02/001.mp3       |
+| ITS                                    | 02     | 002   | 02/002.mp3       |
+| OCLOCK                                 | 02     | 003   | 02/003.mp3       |
+| GOOD_AFTERNOON                         | 02     | 004   | 02/004.mp3       |
+| GOOD_EVENING                           | 02     | 005   | 02/005.mp3       |
+| KALESPERA                              | 02     | 007   | 02/007.mp3       |
+| SETUP_REQUEST                          | 02     | 008   | 02/008.mp3       |
+| EFKARISTO                              | 02     | 009   | 02/009.mp3       |
+| PETROS_MAN_OF_STONE                    | 02     | 010   | 02/010.mp3       |
+| YAMAS_PETROS_ANOTHER_GLASS             | 02     | 011   | 02/011.mp3       |
+| BEWARE_MORTAL                          | 02     | 012   | 02/012.mp3       |
+| KALEMERA                               | 02     | 013   | 02/013.mp3       |
+| YASOU                                  | 02     | 014   | 02/014.mp3       |
+| OPA                                    | 02     | 015   | 02/015.mp3       |
+
 
 
 
