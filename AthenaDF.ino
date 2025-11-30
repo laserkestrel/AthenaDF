@@ -12,7 +12,6 @@
 #define DFPLAYER_RX 26  // ESP32 RX (connects to DFPlayer TX)
 #define DFPLAYER_TX 27  // ESP32 TX (connects to DFPlayer RX)
 
-
 // I2C for RTC
 #define SDA_PIN 21
 #define SCL_PIN 22
@@ -30,6 +29,11 @@ const byte DNS_PORT = 53;
 bool setupDone = false;
 bool rtcAvailable = false;
 bool spokenThisHour = false;
+
+// -----------------------------
+// Test mode
+// -----------------------------
+bool testMode = true;  // Set true to announce every minute for testing
 
 // -----------------------------
 // Mapping table (dual-folder)
@@ -124,7 +128,7 @@ void startCaptivePortal() {
 // -----------------------------
 void playHourAnnouncement(uint8_t hour) {
   // Simple greeting selection based on hour
-  uint8_t greetingIndex = 0; // Always Good Morning for demo; can adapt
+  uint8_t greetingIndex = 0; // Always Good Morning for demo
 
   // Sequence: Greeting -> "It's" -> Hour -> "O'Clock"
   dfplayer.playFolder(greetingPhrases[greetingIndex].folder,
@@ -205,15 +209,28 @@ void loop() {
 
   DateTime now = rtc.now();
 
-  // Announce on the hour
-  if (now.minute() == 0 && !spokenThisHour) {
-    Serial.printf("Playing hourly announcement: %02d:00\n", now.hour());
+  // Determine if we should announce
+  bool shouldAnnounce = false;
+
+  if (testMode) {
+    // Announce every minute
+    if (!spokenThisHour) shouldAnnounce = true;
+  } else {
+    // Normal mode: announce only at the top of the hour
+    if (now.minute() == 0 && !spokenThisHour) shouldAnnounce = true;
+  }
+
+  if (shouldAnnounce) {
+    Serial.printf("Playing announcement: %02d:%02d\n", now.hour(), now.minute());
     playHourAnnouncement(now.hour());
     spokenThisHour = true;
   }
 
-  if (now.minute() != 0) {
+  // Reset flag when minute changes
+  static uint8_t lastMinute = 255;
+  if (now.minute() != lastMinute) {
     spokenThisHour = false;
+    lastMinute = now.minute();
   }
 
   delay(1000);
