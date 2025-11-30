@@ -48,8 +48,8 @@ const Phrase phraseMap[] = {
   {1, 5},  // ONE          → 01/005.mp3
   {1, 6}   // TWO          → 01/006.mp3
 };
-
-Key Design Choices
+```
+### Key Design Choices
 
 Folders for deterministic playback: Avoids unpredictable FAT32 ordering in the root folder.
 
@@ -59,7 +59,7 @@ Dynamic sequences: Makes the spoken clock extensible — can add more words, lan
 
 Delay-based playback (initially): Simple to implement; can be replaced by BUSY pin detection for precise timing without guesswork.
 
-Next Steps / Improvements
+### Next Steps / Improvements
 
 Replace delay() with BUSY pin detection to accurately detect when a track finishes.
 
