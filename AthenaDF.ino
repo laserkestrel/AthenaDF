@@ -1,41 +1,62 @@
 #include "DFRobotDFPlayerMini.h"
+#include <HardwareSerial.h>
 
-// UART1 on ESP32
+// Use UART1 on ESP32
 HardwareSerial dfSerial(1);
 DFRobotDFPlayerMini dfplayer;
 
-// --- MAPPING TABLE ---
-// Each word maps to (folder, track) pair
+// --- Mapping Table ---
 struct Phrase {
   uint8_t folder;
   uint8_t track;
 };
 
-// Logical word IDs
+// Logical words
 enum Words {
-  GOOD_MORNING = 0,
+  ONE = 0,
+  TWO,
+  THREE,
+  FOUR,
+  FIVE,
+  SIX,
+  SEVEN,
+  EIGHT,
+  NINE,
+  TEN,
+  ELEVEN,
+  TWELVE,
+  GOOD_MORNING,
   ITS,
-  OCLOCK,
-  ONE,
-  TWO
+  OCLOCK
 };
 
-// Map logical words → folder/track on SD
+// Map logical words → folder/track
 const Phrase phraseMap[] = {
-  {1, 2},  // GOOD_MORNING → /01/002.mp3
-  {1, 3},  // ITS          → /01/003.mp3
-  {1, 4},  // OCLOCK       → /01/004.mp3
-  {1, 5},  // ONE          → /01/005.mp3
-  {1, 6}   // TWO          → /01/006.mp3
+  {1, 1},  // ONE
+  {1, 2},  // TWO
+  {1, 3},  // THREE
+  {1, 4},  // FOUR
+  {1, 5},  // FIVE
+  {1, 6},  // SIX
+  {1, 7},  // SEVEN
+  {1, 8},  // EIGHT
+  {1, 9},  // NINE
+  {1, 10}, // TEN
+  {1, 11}, // ELEVEN
+  {1, 12}, // TWELVE
+  {2, 1},  // GOOD_MORNING
+  {2, 2},  // ITS
+  {2, 3}   // OCLOCK
 };
 
-// Approximate durations in milliseconds for each word
-const uint16_t trackLengthMs[] = {1000, 800, 800, 800, 800};
+// Approximate track durations (ms)
+const uint16_t trackLengthMs[] = {
+  800,800,800,800,800,800,800,800,800,800,800,800,  // ONE → TWELVE
+  1200, 800, 800 // GOOD_MORNING, ITS, OCLOCK
+};
 
 void setup() {
   Serial.begin(115200);
-
-  // RX = 26, TX = 27
   dfSerial.begin(9600, SERIAL_8N1, 26, 27);
 
   Serial.println("Initializing DFPlayer...");
@@ -43,31 +64,23 @@ void setup() {
     Serial.println("DFPlayer Mini not responding!");
     while(true);
   }
-
-  dfplayer.volume(25); // 0–30
-  delay(200);
+  dfplayer.volume(25);
   Serial.println("DFPlayer Initialised!");
 
-  // --- Example playback sequence ---
-  // "Good Morning, It's One O'Clock"
-  Words sequence1[] = {GOOD_MORNING, ITS, ONE, OCLOCK};
+  // Simulated current time (1–12 hours)
+  uint8_t hour = 3; // Example: 3 o'clock
 
-  // "Good Morning, It's Two O'Clock"
-  Words sequence2[] = {GOOD_MORNING, ITS, TWO, OCLOCK};
-
-  // Play both sequences with a pause in between
-  playSequence(sequence1, sizeof(sequence1)/sizeof(sequence1[0]));
-  delay(1000);
-  playSequence(sequence2, sizeof(sequence2)/sizeof(sequence2[0]));
-
-  Serial.println("Done playing sequences!");
+  // Play a greeting sequence based on time
+  Words sequence[] = {GOOD_MORNING, ITS, static_cast<Words>(hour - 1), OCLOCK};
+  playSequence(sequence, sizeof(sequence)/sizeof(sequence[0]));
+  Serial.println("Done playing time announcement!");
 }
 
 void loop() {
-  // Nothing needed here for this test
+  // Nothing needed here; later you can trigger this hourly
 }
 
-// Function to play an array of word IDs
+// Function to play a sequence of word IDs
 void playSequence(Words seq[], size_t len) {
   for (size_t i = 0; i < len; i++) {
     Phrase p = phraseMap[seq[i]];
@@ -78,7 +91,7 @@ void playSequence(Words seq[], size_t len) {
 
     dfplayer.playFolder(p.folder, p.track);
 
-    // Wait for the track to finish (approximate)
+    // Wait for track to finish (approximate)
     delay(trackLengthMs[seq[i]]);
   }
 }
